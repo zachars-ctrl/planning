@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Planning — Zacharie</title>
+<meta name="theme-color" content="#F3F5F4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10151A" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Spline+Sans+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ════════════════════════════════════════════════════════════════════
+   1. COULEURS
+   Mode clair d'abord, mode sombre juste en dessous : il suit tout seul
+   le réglage du téléphone. Les couleurs des RAYONS ne sont pas ici,
+   elles sont dans le bloc RÉGLAGES du script, plus bas.
+   ════════════════════════════════════════════════════════════════════ */
+:root{
+  --papier:#F3F5F4;      /* fond de page                        */
+  --carte:#FFFFFF;       /* fond des cartes                     */
+  --encre:#141A1F;       /* texte principal                     */
+  --sourdine:#6C7681;    /* texte secondaire                    */
+  --ligne:#DCE1DF;       /* bordures fines                      */
+  --rail:#E9EDEB;        /* fond des barres horaires            */
+  --puce:#EEF1F0;        /* fond des étiquettes d'heure         */
+  --fluo:rgba(63,201,182,.38);   /* le surligneur — signature de la page */
+  --alerte:#B4831B;      /* ambre : journées à vérifier         */
+  --alerte-fond:rgba(180,131,27,.12);
+  --chaud:#C2521E;       /* température élevée                  */
+  --froid:#3D6EA5;       /* température basse                   */
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --papier:#10151A;
+    --carte:#171E24;
+    --encre:#E8ECEA;
+    --sourdine:#8B95A0;
+    --ligne:#242C33;
+    --rail:#20272E;
+    --puce:#1F262D;
+    --fluo:rgba(56,191,173,.26);
+    --alerte:#D3A544;
+    --alerte-fond:rgba(211,165,68,.14);
+    --chaud:#E0793F;
+    --froid:#6E9FD1;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   2. BASE
+   ════════════════════════════════════════════════════════════════════ */
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--papier);
+  color:var(--encre);
+  font-family:"Archivo",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  padding:0 16px calc(56px + env(safe-area-inset-bottom));
+}
+.cadre{max-width:640px;margin:0 auto}
+
+/* ════════════════════════════════════════════════════════════════════
+   3. BARRE DU HAUT — reste visible quand on fait défiler
+   ════════════════════════════════════════════════════════════════════ */
+.barre{
+  position:sticky;top:0;z-index:10;
+  margin:0 -16px;padding:14px 16px 10px;
+  display:flex;align-items:center;gap:12px;
+  background:var(--papier);
+  border-bottom:1px solid transparent;
+  transition:border-color .2s;
+}
+.barre.detachee{border-bottom-color:var(--ligne)}
+.barre .lieu{
+  font-family:"Spline Sans Mono",monospace;
+  font-size:11px;font-weight:500;
+  letter-spacing:.14em;text-transform:uppercase;
+  color:var(--sourdine);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.btn-actu{
+  margin-left:auto;flex:none;
+  display:inline-flex;align-items:center;gap:7px;
+  height:34px;padding:0 13px;
+  border:1px solid var(--ligne);border-radius:99px;
+  background:var(--carte);color:var(--encre);
+  font-family:"Spline Sans Mono",monospace;
+  font-size:11.5px;letter-spacing:.04em;
+  cursor:pointer;
+}
+.btn-actu svg{width:14px;height:14px}
+.btn-actu[data-etat="charge"]{color:var(--sourdine)}
+.btn-actu[data-etat="charge"] svg{animation:tourne .9s linear infinite}
+@keyframes tourne{to{transform:rotate(360deg)}}
+
+/* ════════════════════════════════════════════════════════════════════
+   4. TITRE
+   ════════════════════════════════════════════════════════════════════ */
+h1{
+  margin-top:12px;
+  font-size:clamp(34px,9vw,46px);
+  font-weight:850;
+  font-variation-settings:"wdth" 118;   /* Archivo élargi : effet panneau de service */
+  letter-spacing:-.015em;line-height:1;
+  text-transform:uppercase;
+}
+
+/* Le coup de surligneur — l'élément signature de la page. */
+.surligne{position:relative;z-index:0;display:inline-block}
+.surligne::before{
+  content:"";position:absolute;z-index:-1;
+  inset:8% -7px 4% -5px;
+  background:var(--fluo);
+  border-radius:3px;
+  transform:rotate(-1.4deg);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   5. CARTE « PROCHAIN SERVICE »
+   ════════════════════════════════════════════════════════════════════ */
+.prochain{
+  margin-top:22px;
+  background:var(--carte);
+  border:1px solid var(--ligne);
+  border-radius:14px;
+  padding:16px 18px 18px;
+}
+.prochain .etiquette{
+  font-family:"Spline Sans Mono",monospace;
+  font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--sourdine);
+}
+.prochain .quand{margin-top:8px;font-size:17px;font-weight:700}
+.prochain .heure{
+  margin-top:6px;
+  font-family:"Spline Sans Mono",monospace;
+  font-variant-numeric:tabular-nums;
+  font-size:clamp(26px,7vw,32px);font-weight:600;
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+.prochain .ciel{
+  margin-top:10px;
+  display:flex;align-items:center;gap:8px;
+  font-size:13px;color:var(--sourdine);
+}
+.prochain .vide{margin-top:8px;color:var(--sourdine);font-size:15px}
+
+/* ════════════════════════════════════════════════════════════════════
+   6. ÉTIQUETTES : rayon et météo
+   ════════════════════════════════════════════════════════════════════ */
+.badge{
+  font-family:"Spline Sans Mono",monospace;
+  font-size:11px;font-weight:600;
+  letter-spacing:.08em;text-transform:uppercase;
+  color:#fff;padding:4px 9px;border-radius:99px;
+  white-space:nowrap;
+}
+.badge.contour{
+  background:transparent;color:var(--sourdine);
+  border:1px solid var(--ligne);font-weight:500;
+}
+.meteo{
+  display:inline-flex;align-items:center;gap:5px;
+  font-family:"Spline Sans Mono",monospace;
+  font-variant-numeric:tabular-nums;
+  font-size:12px;font-weight:500;
+  color:var(--sourdine);white-space:nowrap;
+}
+.meteo svg{width:15px;height:15px;flex:none}
+.meteo .chaud{color:var(--chaud);font-weight:700}
+.meteo .froid{color:var(--froid);font-weight:700}
+.prochain .ciel svg{width:17px;height:17px;flex:none}
+
+/* ════════════════════════════════════════════════════════════════════
+   7. NAVIGATION DE SEMAINE
+   ════════════════════════════════════════════════════════════════════ */
+.nav-semaine{margin-top:30px;display:flex;align-items:center;gap:10px}
+.fleche{
+  width:42px;height:42px;flex:none;
+  border:1px solid var(--ligne);border-radius:12px;
+  background:var(--carte);color:var(--encre);
+  font-size:18px;cursor:pointer;
+  display:grid;place-items:center;
+}
+.fleche:disabled{opacity:.3;cursor:default}
+.fleche:focus-visible,.retour-auj:focus-visible,
+.agenda-btn:focus-visible,.btn-actu:focus-visible{
+  outline:3px solid var(--alerte);outline-offset:2px;
+}
+.nav-titre{flex:1;text-align:center;min-width:0}
+.nav-titre h2{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.nav-titre .total{
+  margin-top:3px;
+  font-family:"Spline Sans Mono",monospace;
+  font-variant-numeric:tabular-nums;
+  font-size:12px;color:var(--sourdine);
+}
+.retour-auj{
+  display:block;margin:12px auto 0;
+  font-family:"Spline Sans Mono",monospace;
+  font-size:12px;letter-spacing:.06em;
+  color:var(--encre);background:var(--fluo);
+  border:none;border-radius:99px;padding:7px 14px;cursor:pointer;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   8. JOURNÉES
+   ════════════════════════════════════════════════════════════════════ */
+.jours{margin-top:14px}
+.jour{
+  background:var(--carte);
+  border:1px solid var(--ligne);
+  border-radius:14px;
+  padding:14px 16px;margin-top:10px;
+}
+.jour.repos{background:transparent;border-style:dashed;padding:11px 16px}
+.jour.attention{border-color:var(--alerte)}
+.jour-entete{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.jour-entete .meteo{margin-left:auto}
+.numero{
+  font-family:"Spline Sans Mono",monospace;
+  font-variant-numeric:tabular-nums;
+  font-size:22px;font-weight:700;
+  min-width:2ch;text-align:right;
+}
+.nom-jour{font-size:15px;font-weight:700;text-transform:capitalize}
+.jour.repos .numero,.jour.repos .nom-jour{color:var(--sourdine);font-weight:500}
+
+/* La frise horaire : deux blocs et le creux de la coupure entre eux. */
+.frise{position:relative;height:32px;margin-top:12px}
+.frise .fond{
+  position:absolute;left:0;right:0;top:10px;height:8px;
+  background:var(--rail);border-radius:99px;
+}
+.frise .bloc{position:absolute;top:7px;height:14px;border-radius:99px}
+.frise .repere{
+  position:absolute;bottom:0;transform:translateX(-50%);
+  font-family:"Spline Sans Mono",monospace;
+  font-size:9.5px;color:var(--sourdine);
+}
+.heures{
+  margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+  font-family:"Spline Sans Mono",monospace;
+  font-variant-numeric:tabular-nums;
+  font-size:13px;font-weight:500;
+}
+.heures span{background:var(--puce);border-radius:7px;padding:3px 8px}
+.coupure{font-size:12px;color:var(--sourdine);font-family:"Archivo",sans-serif}
+.note{margin-top:8px;font-size:13px;color:var(--sourdine)}
+.note.verif{
+  display:inline-block;
+  color:var(--alerte);background:var(--alerte-fond);
+  border-radius:7px;padding:4px 9px;font-weight:600;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   9. SEMAINE PAS ENCORE REÇUE
+   ════════════════════════════════════════════════════════════════════ */
+.manquante{
+  margin-top:14px;padding:30px 22px;
+  border:1px dashed var(--ligne);border-radius:14px;
+  text-align:center;
+}
+.manquante .titre{font-size:16px;font-weight:700}
+.manquante .aide{
+  margin-top:8px;font-size:13.5px;color:var(--sourdine);line-height:1.5;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   10. BOUTON AGENDA, LÉGENDE, ÉTATS, PIED
+   ════════════════════════════════════════════════════════════════════ */
+.agenda-btn{
+  display:block;width:100%;margin-top:16px;padding:14px;
+  background:var(--encre);color:var(--papier);
+  border:none;border-radius:12px;
+  font-family:"Archivo",sans-serif;font-size:14px;font-weight:700;
+  cursor:pointer;
+}
+.agenda-btn:active{opacity:.75}
+.legende{
+  margin-top:22px;display:flex;flex-wrap:wrap;gap:8px 16px;
+  font-family:"Spline Sans Mono",monospace;
+  font-size:11px;color:var(--sourdine);
+}
+.legende .point{
+  display:inline-block;width:8px;height:8px;border-radius:99px;margin-right:5px;
+}
+.etat{
+  margin-top:30px;padding:22px;
+  border:1px dashed var(--ligne);border-radius:14px;
+  color:var(--sourdine);font-size:14px;line-height:1.55;
+}
+.etat strong{display:block;color:var(--encre);font-size:15px;margin-bottom:6px}
+footer{
+  margin-top:38px;padding-top:14px;border-top:1px solid var(--ligne);
+  font-family:"Spline Sans Mono",monospace;
+  font-size:11px;color:var(--sourdine);
+}
+
+@media (prefers-reduced-motion:no-preference){
+  .entree{animation:arrivee .26s ease both}
+  @keyframes arrivee{
+    from{opacity:0;transform:translateY(7px)}
+    to{opacity:1;transform:none}
+  }
+}
+@media (prefers-reduced-motion:reduce){
+  .btn-actu[data-etat="charge"] svg{animation:none}
+}
+</style>
+</head>
+<body>
+<div class="cadre">
+
+  <div class="barre" id="barre">
+    <span class="lieu">079 · Univers Sec &amp; Non Food</span>
+    <button class="btn-actu" id="actualiser" data-etat="repos">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 11a8 8 0 1 0-.6 4"/><path d="M20 4v7h-7"/>
+      </svg>
+      <span id="actu-texte">Actualiser</span>
+    </button>
+  </div>
+
+  <h1>Planning</h1>
+  <div id="app"><p class="etat">Chargement du tableau…</p></div>
+  <footer id="pied"></footer>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   RÉGLAGES — tout ce que tu pourrais vouloir changer est ICI.
+   Le reste du fichier n'a pas besoin d'être touché.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Adresse du tableau publié. À copier-coller, jamais à retaper. */
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTNo85oytJdVPxASHIqPyHowMSs8kqAPIr3h9xXE1js6UrrjAeMTRjFlos5qZ038J8PA--y96bBi0ue/pubhtml";
+
+/* Les rayons : code (minuscules, sans accent) → nom complet + couleur.
+   Ajouter un rayon = ajouter une ligne sur ce modèle. */
+const RAYONS = {
+  nf:        { nom: "Non-alimentaire", couleur: "#3D6EA5" },
+  seche:     { nom: "Épicerie sèche",  couleur: "#B06A1E" },
+  sucree:    { nom: "Épicerie sucrée", couleur: "#B54069" },
+  cave:      { nom: "Cave",            couleur: "#6C4AA0" },
+  brass:     { nom: "Brasserie",       couleur: "#2F7D5B" },
+  brasserie: { nom: "Brasserie",       couleur: "#2F7D5B" },
+  bass:      { nom: "Brasserie",       couleur: "#2F7D5B" }
+};
+const COULEUR_RAYON_INCONNU = "#5A6670";
+
+/* Météo : coordonnées de Caen. Pour une autre ville, cherche
+   « coordonnées GPS <ville> » et remplace les deux nombres. */
+const LATITUDE  = 49.1829;
+const LONGITUDE = -0.3707;
+
+/* Seuils qui colorent la température (orange au-dessus, bleu en dessous). */
+const SEUIL_CHAUD = 27;
+const SEUIL_FROID = 6;
+
+const JOURS_FR = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
+const MOIS_FR  = ["janvier","février","mars","avril","mai","juin","juillet",
+                  "août","septembre","octobre","novembre","décembre"];
+
+/* ════════════════════════════════════════════════════════════════════
+   OUTILS DE BASE
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Enlève accents et majuscules, pour comparer sans se faire piéger. */
+const simplifier = t => (t||"").toString().normalize("NFD")
+  .replace(/[\u0300-\u036f]/g,"").trim().toLowerCase();
+
+/* Empêche qu'un texte venu du tableau soit interprété comme du code. */
+const echapper = t => (t||"").replace(/[&<>"]/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* "11:02", "11:02:00" ou "11h02" → minutes depuis minuit. */
+function enMinutes(h){
+  const m=(h||"").match(/(\d{1,2})\s*[:h]\s*(\d{2})/);
+  return m ? (+m[1])*60 + (+m[2]) : null;
+}
+/* L'inverse : 662 → "11:02". */
+const versHHMM = m =>
+  String(Math.floor(m/60)).padStart(2,"0") + ":" + String(m%60).padStart(2,"0");
+
+/* Une date JavaScript → "2026-07-28" (heure locale, pas UTC). */
+const versIso = d =>
+  d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")
+  +"-"+String(d.getDate()).padStart(2,"0");
+
+const aujourdhuiIso = () => versIso(new Date());
+
+/* ════════════════════════════════════════════════════════════════════
+   LECTURE DU TABLEAU
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Découpe une ligne CSV en respectant les guillemets. */
+function decouperLigne(ligne){
+  const cases=[]; let courante="", entreGuillemets=false;
+  for(let i=0;i<ligne.length;i++){
+    const c=ligne[i];
+    if(c==='"'){
+      if(entreGuillemets && ligne[i+1]==='"'){courante+='"';i++;}
+      else entreGuillemets=!entreGuillemets;
+    }
+    else if(c==="," && !entreGuillemets){cases.push(courante);courante="";}
+    else courante+=c;
+  }
+  cases.push(courante);
+  return cases.map(v=>v.trim());
+}
+
+function lireCSV(texte){
+  const lignes = texte.split(/\r?\n/).filter(l=>l.trim()!=="");
+  if(!lignes.length) return [];
+
+  /* On repère chaque colonne par son titre, pas par sa position :
+     si une colonne bouge dans le Sheet un jour, rien ne casse. */
+  const entetes = decouperLigne(lignes[0]).map(simplifier);
+  const col = nom => entetes.findIndex(e=>e===nom);
+  const iDate=col("date"), iStatut=col("statut"),
+        iRayon=col("rayon"), iNote=col("note"),
+        iDM=col("debut matin"), iFM=col("fin matin"),
+        iDA=col("debut aprem"), iFA=col("fin aprem");
+
+  return lignes.slice(1).map(l=>{
+    const c = decouperLigne(l);
+    const iso = (c[iDate]||"").slice(0,10);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;   /* pas de date : ignorée */
+
+    const creneaux=[];
+    [[iDM,iFM],[iDA,iFA]].forEach(([a,b])=>{
+      const debut=enMinutes(c[a]), fin=enMinutes(c[b]);
+      if(debut!==null && fin!==null && fin>debut) creneaux.push({debut,fin});
+    });
+
+    return {
+      iso,
+      date: new Date(iso+"T12:00:00"),
+      statut: simplifier(c[iStatut]),
+      rayon: (c[iRayon]||"").trim(),
+      note: (c[iNote]||"").trim(),
+      creneaux
+    };
+  }).filter(Boolean).sort((a,b)=>a.iso<b.iso?-1:1);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   REGROUPEMENT PAR SEMAINE (lundi → dimanche)
+   Les semaines absentes du tableau sont recréées vides, pour qu'un
+   planning pas encore photographié se voie au lieu d'être sauté.
+   ════════════════════════════════════════════════════════════════════ */
+function lundiDe(date){
+  const d = new Date(date);
+  d.setHours(12,0,0,0);
+  d.setDate(d.getDate() - (d.getDay()+6)%7);
+  return d;
+}
+
+function grouperParSemaine(jours){
+  /* 1. On range chaque journée dans sa semaine. */
+  const paquets = new Map();
+  jours.forEach(j=>{
+    const lundi = lundiDe(j.date);
+    const cle = versIso(lundi);
+    if(!paquets.has(cle)) paquets.set(cle,{lundiIso:cle, lundi, jours:[], manquante:false});
+    paquets.get(cle).jours.push(j);
+  });
+
+  /* 2. On parcourt du premier au dernier lundi, semaine par semaine,
+        et on crée une semaine vide partout où il n'y a rien. */
+  const cles = [...paquets.keys()].sort();
+  const resultat = [];
+  const curseur = new Date(paquets.get(cles[0]).lundi);
+  const dernier = paquets.get(cles[cles.length-1]).lundi;
+
+  while(versIso(curseur) <= versIso(dernier)){
+    const cle = versIso(curseur);
+    resultat.push(paquets.get(cle) || {
+      lundiIso: cle, lundi: new Date(curseur), jours: [], manquante: true
+    });
+    curseur.setDate(curseur.getDate()+7);
+  }
+  return resultat;
+}
+
+/* Sur quelle semaine ouvrir : celle d'aujourd'hui, sinon la prochaine
+   à venir, sinon la dernière connue. */
+function semaineDeDepart(semaines){
+  const auj = aujourdhuiIso();
+  for(let i=0;i<semaines.length;i++){
+    const fin = new Date(semaines[i].lundi);
+    fin.setDate(fin.getDate()+6);
+    if(auj <= versIso(fin)) return i;
+  }
+  return semaines.length-1;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MÉTÉO
+   Open-Meteo : gratuit, sans clé, sans compte. Les prévisions ne vont
+   qu'à une quinzaine de jours ; au-delà, la pastille ne s'affiche pas.
+   Si le service ne répond pas, la page marche exactement pareil.
+   ════════════════════════════════════════════════════════════════════ */
+let METEO = {};   /* "2026-07-29" → {code, mini, maxi} */
+
+const TRAIT = 'fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"';
+const NUAGE = '<path d="M6.5 17h9a3.4 3.4 0 0 0 .3-6.8 4.9 4.9 0 0 0-9.5 1.1A3.1 3.1 0 0 0 6.5 17Z"/>';
+const ICONES = {
+  soleil:     '<circle cx="12" cy="12" r="4.2"/><path d="M12 3v1.8M12 19.2V21M3 12h1.8M19.2 12H21M5.6 5.6l1.3 1.3M17.1 17.1l1.3 1.3M18.4 5.6l-1.3 1.3M6.9 17.1l-1.3 1.3"/>',
+  eclaircies: '<circle cx="8.5" cy="8" r="2.6"/><path d="M8.5 3.4v-1M5 9.6l-.9.9M12 4.5l.9-.9M4.2 4.5l.9.9"/>'+NUAGE,
+  couvert:    NUAGE,
+  brouillard: '<path d="M4 8h16M3 12h18M6 16h13M4 20h14"/>',
+  pluie:      NUAGE+'<path d="M9.5 19.5l-.7 1.6M13 19.5l-.7 1.6M16.5 19.5l-.7 1.6"/>',
+  neige:      NUAGE+'<path d="M9.5 20.3h.01M13 20.3h.01M16.5 20.3h.01"/>',
+  orage:      NUAGE+'<path d="M13 19l-2.4 3h2.8L11.6 24"/>'
+};
+
+/* Les codes météo officiels (norme OMM) rangés par famille. */
+function familleMeteo(code){
+  if(code===0)  return "soleil";
+  if(code<=2)   return "eclaircies";
+  if(code===3)  return "couvert";
+  if(code<=48)  return "brouillard";
+  if(code<=67)  return "pluie";
+  if(code<=77)  return "neige";
+  if(code<=82)  return "pluie";
+  if(code<=86)  return "neige";
+  return "orage";
+}
+const LIBELLES_METEO = {
+  soleil:"Grand soleil", eclaircies:"Éclaircies", couvert:"Couvert",
+  brouillard:"Brouillard", pluie:"Pluie", neige:"Neige", orage:"Orage"
+};
+
+/* La pastille discrète affichée à côté d'une journée. */
+function pastilleMeteo(iso){
+  const m = METEO[iso];
+  if(!m) return "";
+  const famille = familleMeteo(m.code);
+  const classe = m.maxi>=SEUIL_CHAUD ? "chaud" : (m.maxi<=SEUIL_FROID ? "froid" : "");
+  return `<span class="meteo" title="${LIBELLES_METEO[famille]}">
+    <svg viewBox="0 0 24 26" ${TRAIT}>${ICONES[famille]}</svg>
+    <span class="${classe}">${Math.round(m.mini)}→${Math.round(m.maxi)}°</span>
+  </span>`;
+}
+
+/* La version en toutes lettres, pour la carte du haut. */
+function ligneMeteo(iso){
+  const m = METEO[iso];
+  if(!m) return "";
+  const famille = familleMeteo(m.code);
+  return `<p class="ciel">
+    <svg viewBox="0 0 24 26" ${TRAIT}>${ICONES[famille]}</svg>
+    <span>${LIBELLES_METEO[famille]} · ${Math.round(m.mini)}° au lever, ${Math.round(m.maxi)}° l'après-midi</span>
+  </p>`;
+}
+
+function chargerMeteo(){
+  const url = "https://api.open-meteo.com/v1/forecast"
+            + "?latitude=" + LATITUDE + "&longitude=" + LONGITUDE
+            + "&daily=weather_code,temperature_2m_max,temperature_2m_min"
+            + "&timezone=auto&forecast_days=16";
+  return fetch(url)
+    .then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); })
+    .then(d=>{
+      d.daily.time.forEach((iso,i)=>{
+        METEO[iso] = {
+          code: d.daily.weather_code[i],
+          maxi: d.daily.temperature_2m_max[i],
+          mini: d.daily.temperature_2m_min[i]
+        };
+      });
+    })
+    .catch(()=>{ /* pas de météo : la page reste parfaitement utilisable */ });
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PETITS OUTILS D'AFFICHAGE
+   ════════════════════════════════════════════════════════════════════ */
+function infosRayon(rayon){
+  const cle = simplifier(rayon).replace(/[^a-z]/g,"");
+  return RAYONS[cle] || { nom: rayon, couleur: COULEUR_RAYON_INCONNU };
+}
+
+/* Le titre se calcule sur le lundi et le dimanche de la semaine, pas
+   sur les journées présentes : une semaine incomplète garde son vrai titre. */
+function titreSemaine(sem){
+  const d1 = sem.lundi;
+  const d2 = new Date(sem.lundi); d2.setDate(d2.getDate()+6);
+  if(d1.getMonth()===d2.getMonth())
+    return `Semaine du ${d1.getDate()} au ${d2.getDate()} ${MOIS_FR[d2.getMonth()]}`;
+  return `Semaine du ${d1.getDate()} ${MOIS_FR[d1.getMonth()]} au ${d2.getDate()} ${MOIS_FR[d2.getMonth()]}`;
+}
+
+function totalHeures(sem){
+  const minutes = sem.jours.flatMap(j=>j.creneaux)
+                           .reduce((somme,c)=>somme+(c.fin-c.debut),0);
+  return (minutes/60).toFixed(1).replace(".",",");
+}
+
+const noteAVerifier = j => simplifier(j.note).includes("verifier");
+
+/* ════════════════════════════════════════════════════════════════════
+   CARTE « PROCHAIN SERVICE »
+   Répond en une seconde à : je bosse quand, la prochaine fois ?
+   ════════════════════════════════════════════════════════════════════ */
+function prochainService(jours){
+  const maintenant = new Date();
+  for(const j of jours){
+    for(const c of j.creneaux){
+      const fin = new Date(j.iso+"T00:00:00"); fin.setMinutes(c.fin);
+      if(fin <= maintenant) continue;                 /* créneau déjà passé */
+      const debut = new Date(j.iso+"T00:00:00"); debut.setMinutes(c.debut);
+
+      const demain = new Date(); demain.setDate(demain.getDate()+1);
+      const nomJour = JOURS_FR[j.date.getDay()];
+      let quand;
+      if(debut<=maintenant)             quand = "En ce moment — jusqu'à "+versHHMM(c.fin);
+      else if(j.iso===aujourdhuiIso())  quand = "Aujourd'hui";
+      else if(j.iso===versIso(demain))  quand = "Demain — "+nomJour+" "+j.date.getDate();
+      else quand = nomJour.charAt(0).toUpperCase()+nomJour.slice(1)
+                 +" "+j.date.getDate()+" "+MOIS_FR[j.date.getMonth()];
+
+      const r = j.rayon ? infosRayon(j.rayon) : null;
+      return `<section class="prochain entree">
+        <p class="etiquette">Prochain service</p>
+        <p class="quand">${echapper(quand)}</p>
+        <p class="heure">
+          <span class="surligne">${versHHMM(c.debut)} – ${versHHMM(c.fin)}</span>
+          ${r ? `<span class="badge" style="background:${r.couleur}" title="${echapper(r.nom)}">${echapper(j.rayon)}</span>` : ""}
+        </p>
+        ${ligneMeteo(j.iso)}
+      </section>`;
+    }
+  }
+  return `<section class="prochain entree">
+    <p class="etiquette">Prochain service</p>
+    <p class="vide">Rien de prévu dans le tableau pour l'instant.</p>
+  </section>`;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   AFFICHAGE D'UNE JOURNÉE
+   ════════════════════════════════════════════════════════════════════ */
+function friseHoraire(creneaux, minSemaine, maxSemaine, couleur){
+  const largeur = maxSemaine - minSemaine;
+  const pos = v => ((v-minSemaine)/largeur*100).toFixed(2)+"%";
+  let html = '<div class="frise"><div class="fond"></div>';
+  creneaux.forEach(c=>{
+    html += `<div class="bloc" style="left:${pos(c.debut)};width:${((c.fin-c.debut)/largeur*100).toFixed(2)}%;background:${couleur}"></div>`;
+  });
+  for(let h=Math.ceil(minSemaine/120)*120; h<=maxSemaine; h+=120){
+    html += `<span class="repere" style="left:${pos(h)}">${Math.floor(h/60)}h</span>`;
+  }
+  return html+"</div>";
+}
+
+function carteJour(j, minSemaine, maxSemaine){
+  const travaille = j.creneaux.length>0;
+  const estAujourdhui = j.iso===aujourdhuiIso();
+  const verif = noteAVerifier(j);
+  const r = infosRayon(j.rayon);
+
+  let badge="";
+  if(travaille && j.rayon)
+    badge = `<span class="badge" style="background:${r.couleur}" title="${echapper(r.nom)}">${echapper(j.rayon)}</span>`;
+  else if(!travaille){
+    const libelle = j.statut==="ferie" ? "Férié"
+                  : simplifier(j.rayon)==="dimanche" ? "Dimanche" : "Repos";
+    badge = `<span class="badge contour">${libelle}</span>`;
+  }
+
+  /* Aujourd'hui est surligné au marqueur, comme sur le planning papier. */
+  const entete = `<span class="numero">${j.date.getDate()}</span>
+    <span class="nom-jour">${JOURS_FR[j.date.getDay()]}</span>`;
+  const enteteFinal = estAujourdhui
+    ? `<span class="surligne" style="display:flex;align-items:center;gap:11px">${entete}</span>`
+    : entete;
+
+  let html = `<article class="jour${travaille?"":" repos"}${verif?" attention":""}">
+    <div class="jour-entete">${enteteFinal}${pastilleMeteo(j.iso)}${badge}</div>`;
+
+  if(travaille){
+    html += friseHoraire(j.creneaux, minSemaine, maxSemaine, r.couleur);
+    html += '<div class="heures">';
+    j.creneaux.forEach((c,i)=>{
+      html += `<span>${versHHMM(c.debut)} – ${versHHMM(c.fin)}</span>`;
+      const suivant = j.creneaux[i+1];
+      if(suivant && suivant.debut-c.fin>=20)
+        html += `<em class="coupure">coupure ${((suivant.debut-c.fin)/60).toFixed(1).replace(".",",")} h</em>`;
+    });
+    html += "</div>";
+  }
+
+  if(verif) html += `<p class="note verif">À vérifier — la lecture de la photo n'était pas sûre</p>`;
+  else if(j.note) html += `<p class="note">${echapper(j.note)}</p>`;
+
+  return html+"</article>";
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   AFFICHAGE D'UNE SEMAINE, avec la navigation ‹ ›
+   ════════════════════════════════════════════════════════════════════ */
+let semaines=[], indexAffiche=0, indexSemaineActuelle=0, tousLesJours=[];
+
+function afficherSemaine(){
+  const sem = semaines[indexAffiche];
+
+  const entete = `
+    <div class="nav-semaine">
+      <button class="fleche" id="prec" aria-label="Semaine précédente" ${indexAffiche===0?"disabled":""}>‹</button>
+      <div class="nav-titre">
+        <h2>${titreSemaine(sem)}</h2>
+        <p class="total">${sem.manquante ? "—" : totalHeures(sem)+" h travaillées"}</p>
+      </div>
+      <button class="fleche" id="suiv" aria-label="Semaine suivante" ${indexAffiche===semaines.length-1?"disabled":""}>›</button>
+    </div>
+    ${indexAffiche!==indexSemaineActuelle
+      ? `<button class="retour-auj" id="retour">Revenir à cette semaine</button>` : ""}`;
+
+  let corps;
+  if(sem.manquante){
+    corps = `<div class="manquante entree">
+      <p class="titre">Planning pas encore reçu</p>
+      <p class="aide">Dépose la photo de cette semaine dans le dossier
+      <strong>Plannings</strong> de ton Drive : elle apparaîtra ici toute seule.</p>
+    </div>`;
+  } else {
+    /* Échelle commune des frises : de la première prise de poste à la
+       dernière fin, arrondie à l'heure, avec 30 minutes de marge. */
+    const creneaux = sem.jours.flatMap(j=>j.creneaux);
+    let min = creneaux.length ? Math.min(...creneaux.map(c=>c.debut)) : 8*60;
+    let max = creneaux.length ? Math.max(...creneaux.map(c=>c.fin))   : 20*60;
+    min = Math.floor(min/60)*60 - 30;
+    max = Math.ceil(max/60)*60 + 30;
+
+    /* Légende : uniquement les rayons présents cette semaine, en toutes
+       lettres — pour ceux qui ne connaissent pas les codes. */
+    const presents = new Map();
+    sem.jours.forEach(j=>{
+      if(j.creneaux.length && j.rayon){
+        const r = infosRayon(j.rayon);
+        presents.set(r.nom, r.couleur);
+      }
+    });
+    const legende = presents.size
+      ? `<div class="legende">${[...presents].map(([nom,coul])=>
+          `<span><span class="point" style="background:${coul}"></span>${echapper(nom)}</span>`).join("")}</div>`
+      : "";
+
+    corps = `<div class="jours entree">
+      ${sem.jours.map(j=>carteJour(j,min,max)).join("")}
+      <button class="agenda-btn" id="agenda">Ajouter cette semaine à mon calendrier</button>
+      ${legende}
+    </div>`;
+  }
+
+  document.getElementById("zone-semaine").innerHTML = entete + corps;
+
+  document.getElementById("prec").onclick = ()=>{ if(indexAffiche>0){indexAffiche--; afficherSemaine();} };
+  document.getElementById("suiv").onclick = ()=>{ if(indexAffiche<semaines.length-1){indexAffiche++; afficherSemaine();} };
+  const retour = document.getElementById("retour");
+  if(retour) retour.onclick = ()=>{ indexAffiche=indexSemaineActuelle; afficherSemaine(); };
+  const agenda = document.getElementById("agenda");
+  if(agenda) agenda.onclick = ()=>exporterAgenda(sem);
+}
+
+/* Sur ordinateur, les flèches ← → du clavier changent de semaine. */
+document.addEventListener("keydown",e=>{
+  if(!semaines.length) return;
+  if(e.key==="ArrowLeft"  && indexAffiche>0){indexAffiche--; afficherSemaine();}
+  if(e.key==="ArrowRight" && indexAffiche<semaines.length-1){indexAffiche++; afficherSemaine();}
+});
+
+/* ════════════════════════════════════════════════════════════════════
+   EXPORT VERS LE CALENDRIER
+   Fabrique un fichier .ics : sur iPhone il s'ouvre dans Calendrier,
+   qui propose d'ajouter les créneaux. Un événement par créneau.
+   ════════════════════════════════════════════════════════════════════ */
+function exporterAgenda(sem){
+  const l = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//planning-zacharie//FR","CALSCALE:GREGORIAN"];
+  const tampon = new Date().toISOString().replace(/[-:]/g,"").split(".")[0]+"Z";
+  sem.jours.forEach(j=>{
+    const d = j.iso.replace(/-/g,"");
+    j.creneaux.forEach((c,i)=>{
+      l.push("BEGIN:VEVENT",
+        "UID:"+d+"-"+i+"@planning-zacharie",
+        "DTSTAMP:"+tampon,
+        "DTSTART:"+d+"T"+versHHMM(c.debut).replace(":","")+"00",
+        "DTEND:"+d+"T"+versHHMM(c.fin).replace(":","")+"00",
+        "SUMMARY:Travail"+(j.rayon?" · "+j.rayon:""),
+        "END:VEVENT");
+    });
+  });
+  l.push("END:VCALENDAR");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([l.join("\r\n")],{type:"text/calendar"}));
+  a.download="planning-"+sem.lundiIso+".ics";
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   CHARGEMENT ET ACTUALISATION
+   ════════════════════════════════════════════════════════════════════ */
+const boutonActu = document.getElementById("actualiser");
+const texteActu  = document.getElementById("actu-texte");
+
+/* Le lien peut être en /pubhtml ou en /pub?output=csv : on le ramène
+   toujours au CSV, et on ajoute un numéro unique pour que Safari ne
+   ressorte pas une vieille copie gardée en mémoire. */
+const ADRESSE = CSV_URL.replace(/\/pubhtml.*$/,"/pub?output=csv");
+
+function dessinerTout(){
+  document.getElementById("app").innerHTML =
+    prochainService(tousLesJours) + `<div id="zone-semaine"></div>`;
+  afficherSemaine();
+  document.getElementById("pied").textContent =
+    "Tableau lu le " + new Date().toLocaleString("fr-FR",
+      {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+}
+
+function charger(premierChargement){
+  boutonActu.dataset.etat = "charge";
+  texteActu.textContent = "…";
+
+  /* On retient la semaine regardée pour y revenir après l'actualisation. */
+  const semaineRegardee = semaines.length ? semaines[indexAffiche].lundiIso : null;
+
+  return fetch(ADRESSE + "&maj=" + Date.now())
+    .then(r=>{ if(!r.ok) throw new Error(r.status); return r.text(); })
+    .then(texte=>{
+      const jours = lireCSV(texte);
+      if(!jours.length){
+        document.getElementById("app").innerHTML =
+          `<div class="etat"><strong>Le tableau est vide.</strong>
+           Dépose une photo du planning dans le dossier Drive : les lignes
+           apparaîtront ici toutes seules.</div>`;
+        return;
+      }
+      tousLesJours = jours;
+      semaines = grouperParSemaine(jours);
+      indexSemaineActuelle = semaineDeDepart(semaines);
+
+      const retrouvee = semaines.findIndex(s=>s.lundiIso===semaineRegardee);
+      indexAffiche = retrouvee >= 0 ? retrouvee : indexSemaineActuelle;
+
+      dessinerTout();
+      /* La météo arrive après : elle ne doit jamais retarder l'affichage. */
+      return chargerMeteo().then(()=>{ if(Object.keys(METEO).length) dessinerTout(); });
+    })
+    .catch(()=>{
+      if(premierChargement){
+        document.getElementById("app").innerHTML =
+          `<div class="etat"><strong>Le tableau n'a pas pu être lu.</strong>
+           Vérifie que tu as du réseau, puis appuie sur Actualiser. Si ça
+           continue, ouvre le Google Sheet et vérifie dans Fichier → Partager
+           → Publier sur le web que la feuille est toujours publiée en CSV.</div>`;
+      } else {
+        texteActu.textContent = "Échec";
+      }
+    })
+    .finally(()=>{
+      boutonActu.dataset.etat = "repos";
+      if(texteActu.textContent==="…"){
+        texteActu.textContent = "À jour";
+        setTimeout(()=>{ texteActu.textContent = "Actualiser"; }, 1600);
+      }
+    });
+}
+
+boutonActu.onclick = ()=>charger(false);
+
+/* Quand on revient sur la page après l'avoir laissée de côté, on
+   recharge : mieux vaut une seconde d'attente qu'un planning périmé. */
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible" && tousLesJours.length) charger(false);
+});
+
+/* Ombre sous la barre du haut dès qu'on commence à faire défiler. */
+window.addEventListener("scroll",()=>{
+  document.getElementById("barre").classList.toggle("detachee", window.scrollY>4);
+});
+
+charger(true);
+</script>
+</body>
+</html>
